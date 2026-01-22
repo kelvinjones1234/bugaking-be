@@ -31,31 +31,63 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class ProfileUpdateSerializer(serializers.ModelSerializer):
+from rest_framework import serializers
+from .models import Profile, User
+
+
+
+
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    # We explicitly define these to allow updating User model fields via this serializer
     first_name = serializers.CharField(source="user.first_name")
     last_name = serializers.CharField(source="user.last_name")
+    is_approved = serializers.CharField(source="user.is_approved")
+    email = serializers.EmailField(
+        source="user.email", read_only=True
+    )  # Email should usually be read-only here
 
     class Meta:
         model = Profile
         fields = [
+            "id", 
+            "email",
             "first_name",
             "last_name",
             "phone_number",
             "address",
+            "is_approved",
             "profile_picture",
         ]
 
     def update(self, instance, validated_data):
+        # 1. Extract User data if present
         user_data = validated_data.pop("user", {})
 
-        # Update User fields
+        # 2. Update the User model (First/Last Name)
         user = instance.user
-        user.first_name = user_data.get("first_name", user.first_name)
-        user.last_name = user_data.get("last_name", user.last_name)
+        if "first_name" in user_data:
+            user.first_name = user_data.get("first_name")
+        if "last_name" in user_data:
+            user.last_name = user_data.get("last_name")
         user.save()
 
-        # Update Profile fields
+        # 3. Update the Profile model (Phone, Address, Image) with remaining data
         return super().update(instance, validated_data)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class PasswordResetSerializer(serializers.Serializer):

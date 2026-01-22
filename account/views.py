@@ -3,11 +3,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from .models import User
+from .models import User, Profile
 from .serializers import UserRegistrationSerializer
+from .serializers import ProfileSerializer
 
 
 
@@ -100,3 +101,18 @@ class SignUpView(generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+
+
+
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = ProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        # This ensures the view returns the profile of the CURRENT user
+        # It handles the case where a profile might not exist by creating one (safety net)
+        profile, created = Profile.objects.get_or_create(user=self.request.user)
+        return profile
