@@ -28,9 +28,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
+    phone_number = models.CharField(max_length=15, blank=True)
 
     # Financial/Platform specific flags
-    is_active = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_approved = models.BooleanField(
         default=False
@@ -50,7 +51,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 # 3. THE PROFILE MODEL (Information/Dashboard data)
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    phone_number = models.CharField(max_length=15, blank=True)
+    # phone_number = models.CharField(max_length=15, blank=True)
     address = models.TextField(blank=True)
     profile_picture = models.ImageField(upload_to="profiles/", null=True, blank=True)
 

@@ -35,9 +35,10 @@ class SignInView(APIView):
                         "email": user.email,
                         "first_name": user.first_name,
                         "last_name": user.last_name,
+                        "phone_number": user.phone_number,
                         "is_approved": user.is_approved,
+
                         "profile": {
-                            "phone_number": profile.phone_number if profile else None,
                             "address": profile.address if profile else None,
                             "profile_picture": (
                                 profile.profile_picture.url

@@ -12,6 +12,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "phone_number",
             "password",
             "password_confirm",
         ]
@@ -31,27 +32,17 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-from rest_framework import serializers
-from .models import Profile, User
-
-
-
-
-
-
 class ProfileSerializer(serializers.ModelSerializer):
-    # We explicitly define these to allow updating User model fields via this serializer
-    first_name = serializers.CharField(source="user.first_name")
-    last_name = serializers.CharField(source="user.last_name")
-    is_approved = serializers.CharField(source="user.is_approved")
-    email = serializers.EmailField(
-        source="user.email", read_only=True
-    )  # Email should usually be read-only here
+    first_name = serializers.CharField(source="user.first_name", required=False)
+    last_name = serializers.CharField(source="user.last_name", required=False)
+    phone_number = serializers.CharField(source="user.phone_number", required=False)
+    is_approved = serializers.BooleanField(source="user.is_approved", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
 
     class Meta:
         model = Profile
         fields = [
-            "id", 
+            "id",
             "email",
             "first_name",
             "last_name",
@@ -62,32 +53,14 @@ class ProfileSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
-        # 1. Extract User data if present
         user_data = validated_data.pop("user", {})
-
-        # 2. Update the User model (First/Last Name)
         user = instance.user
-        if "first_name" in user_data:
-            user.first_name = user_data.get("first_name")
-        if "last_name" in user_data:
-            user.last_name = user_data.get("last_name")
+
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+
         user.save()
-
-        # 3. Update the Profile model (Phone, Address, Image) with remaining data
         return super().update(instance, validated_data)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class PasswordResetSerializer(serializers.Serializer):
