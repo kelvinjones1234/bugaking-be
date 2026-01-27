@@ -4,6 +4,7 @@ from .views import (
     ClientInvestmentListView,
     CreateInvestmentView,
     InvestmentProjectListView,
+    InvestorDashboardView
 )
 
 urlpatterns = [
@@ -22,4 +23,17 @@ urlpatterns = [
         ClientInvestmentDetailView.as_view(),
         name="investment-detail",
     ),
+
+     path(
+        "dashboard/summary/",
+        InvestorDashboardView.as_view(),
+        name="investment-detail",
+    ),
+
 ]
+
+
+
+
+
+

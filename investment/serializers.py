@@ -55,7 +55,7 @@ class InvestmentProjectSerializer(serializers.ModelSerializer):
         model = InvestmentProject
         fields = [
             "id",
-            "name", 
+            "name",
             "investment_type",
             "asset_type",
             "location",
@@ -81,11 +81,6 @@ class PaymentScheduleSerializer(serializers.ModelSerializer):
 
     def get_formatted_date(self, obj):
         return obj.due_date.strftime("%b %d, %Y")
-
-
-
-
-
 
 
 class ClientInvestmentSerializer(serializers.ModelSerializer):
@@ -145,12 +140,6 @@ class ClientInvestmentSerializer(serializers.ModelSerializer):
         return None
 
 
-
-
-
-
-
-
 class ClientInvestmentDetailSerializer(ClientInvestmentSerializer):
     """
     Detailed view including full payment history/schedules.
@@ -169,44 +158,99 @@ class ClientInvestmentDetailSerializer(ClientInvestmentSerializer):
         return obj.selected_option.project.expected_roi_percent
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 class CreateInvestmentSerializer(serializers.ModelSerializer):
     # We map the frontend's 'pricing_id' directly to the model's 'selected_option'
     pricing_id = serializers.PrimaryKeyRelatedField(
-        queryset=ProjectPricing.objects.all(),
-        source='selected_option', 
-        write_only=True
+        queryset=ProjectPricing.objects.all(), source="selected_option", write_only=True
     )
 
     class Meta:
         model = ClientInvestment
-        fields = ['pricing_id', 'id', 'status']
-        read_only_fields = ['id', 'status']
+        fields = ["pricing_id", "id", "status"]
+        read_only_fields = ["id", "status"]
 
     def validate_pricing_id(self, value):
         """
         Ensure the project associated with this pricing is actually active.
         """
         if not value.project.active:
-            raise serializers.ValidationError("This investment project is currently closed.")
+            raise serializers.ValidationError(
+                "This investment project is currently closed."
+            )
         return value
 
     def create(self, validated_data):
         # Inject the user from the request context
-        validated_data['user'] = self.context['request'].user
-        
-        # We let the Model's save() method handle the auto-calculation 
+        validated_data["user"] = self.context["request"].user
+
+        # We let the Model's save() method handle the auto-calculation
         # of agreed_amount, installment_amount, etc.
         return super().create(validated_data)
+
+
+# Dashboard reated summary
+# Dashboard reated summary
+# Dashboard reated summary
+# Dashboard reated summary
+class NextPaymentSerializer(serializers.Serializer):
+    """Serialize the next upcoming payment strictly for the Stats Card."""
+
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    due_date = serializers.DateField()
+    days_left = serializers.IntegerField()
+
+
+class RecentTransactionSerializer(serializers.ModelSerializer):
+    """Serialize PaymentSchedules that have been paid."""
+
+    project_name = serializers.CharField(
+        source="investment.selected_option.project.name", read_only=True
+    )
+
+    class Meta:
+        model = PaymentSchedule
+        fields = ["id", "title", "project_name", "amount", "date_paid", "status"]
+
+
+class PortfolioItemSerializer(serializers.ModelSerializer):
+    """Serialize active investments for the 'Portfolio Status' cards."""
+
+    project_name = serializers.CharField(
+        source="selected_option.project.name", read_only=True
+    )
+    location = serializers.CharField(
+        source="selected_option.project.location", read_only=True
+    )
+    project_image = serializers.ImageField(
+        source="selected_option.project.project_img", read_only=True
+    )
+    expected_roi = serializers.DecimalField(
+        source="selected_option.project.expected_roi_percent",
+        max_digits=5,
+        decimal_places=2,
+        read_only=True,
+    )
+    equity_held = serializers.FloatField(source="percentage_completion", read_only=True)
+
+    class Meta:
+        model = ClientInvestment
+        fields = [
+            "id",
+            "project_name",
+            "location",
+            "project_image",
+            "expected_roi",
+            "equity_held",
+            "status",
+        ]
+
+
+class DashboardSummarySerializer(serializers.Serializer):
+    """Aggregates all dashboard data into one response."""
+
+    total_invested = serializers.DecimalField(max_digits=20, decimal_places=2)
+    portfolio_value = serializers.DecimalField(max_digits=20, decimal_places=2)
+    projected_roi_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
+    next_payment = NextPaymentSerializer(allow_null=True)
+    recent_transactions = RecentTransactionSerializer(many=True)
+    portfolio_items = PortfolioItemSerializer(many=True)

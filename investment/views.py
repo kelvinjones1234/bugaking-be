@@ -82,3 +82,88 @@ class ClientInvestmentDetailView(APIView):
 
         # 3. Return JSON response
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Sum, Avg
+from django.utils.timezone import now
+from .models import ClientInvestment, PaymentSchedule
+from .serializers import DashboardSummarySerializer
+
+class InvestorDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        today = now().date()
+
+        # 1. Base Query
+        investments = ClientInvestment.objects.filter(user=user)
+
+        # 2. Aggregates
+        total_invested = investments.aggregate(Sum('amount_paid'))['amount_paid__sum'] or 0
+        portfolio_value = investments.aggregate(Sum('agreed_amount'))['agreed_amount__sum'] or 0
+        
+        # Calculate Average ROI
+        avg_roi = investments.aggregate(
+            Avg('selected_option__project__expected_roi_percent')
+        )['selected_option__project__expected_roi_percent__avg'] or 0
+
+        # 3. Next Payment Logic (Find the earliest upcoming schedule)
+        next_schedule = PaymentSchedule.objects.filter(
+            investment__user=user,
+            status__in=['upcoming', 'pending', 'overdue']
+        ).order_by('due_date').first()
+
+        next_payment_data = None
+        if next_schedule:
+            days_left = (next_schedule.due_date - today).days
+            next_payment_data = {
+                "title": next_schedule.title,
+                "amount": next_schedule.amount,
+                "due_date": next_schedule.due_date,
+                # Ensure days_left isn't negative for the "Days Left" display, 
+                # though you might want to handle 'overdue' logic in frontend
+                "days_left": max(days_left, 0) 
+            }
+
+        # 4. Recent Transactions (Last 5 paid items)
+        recent_transactions = PaymentSchedule.objects.filter(
+            investment__user=user,
+            status='paid'
+        ).select_related('investment__selected_option__project').order_by('-date_paid')[:5]
+
+        # 5. Active Portfolio items
+        # Note: We assign this to 'portfolio_items'
+        portfolio_items = investments.exclude(status='completed').select_related('selected_option__project')[:3]
+
+        # 6. Assemble Data
+        data = {
+            "total_invested": total_invested,
+            "portfolio_value": portfolio_value,
+            
+            # Fix 1: Ensure this key matches DashboardSummarySerializer field name exactly
+            "projected_roi_percentage": avg_roi, 
+            
+            "next_payment": next_payment_data,
+            "recent_transactions": recent_transactions,
+            
+            # Fix 2: Use the variable defined in Step 5 ('portfolio_items'), not 'active_portfolio'
+            "portfolio_items": portfolio_items 
+        }
+
+        # Note: context={'request': request} is added to ensure ImageFields generate full URLs
+        serializer = DashboardSummarySerializer(data, context={'request': request})
+        return Response(serializer.data)
