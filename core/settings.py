@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "investment",
     "portfolio",
     "documents",
+    "notification",
     # third party app
     "storages",
     "rest_framework",
