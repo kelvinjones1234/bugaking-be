@@ -35,11 +35,11 @@ DEBUG = ENVIRONMENT == "development"
 # Allowed hosts
 # This allows you to define hosts in .env (e.g., "bugaking.com,www.bugaking.com")
 # or falls back to your PythonAnywhere domain.
-allowed_hosts_env = get_env_variable("DJANGO_ALLOWED_HOSTS", "")
-if allowed_hosts_env:
-    ALLOWED_HOSTS = allowed_hosts_env.split(",")
-else:
-    ALLOWED_HOSTS = ["bugaking.pythonanywhere.com", "localhost", "127.0.0.1"]
+# allowed_hosts_env = get_env_variable("DJANGO_ALLOWED_HOSTS", "")
+# if allowed_hosts_env:
+#     ALLOWED_HOSTS = allowed_hosts_env.split(",")
+# else:
+ALLOWED_HOSTS = ["bugaking.pythonanywhere.com", "localhost", "127.0.0.1", "31d3954f598a.ngrok-free.app"]
 
 
 # Application definition
@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "portfolio",
     "documents",
     "notification",
+    "payment",
     # third party app
     "storages",
     "rest_framework",
@@ -193,6 +194,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://bugaking.vercel.app",
     "http://127.0.0.1:3000",
     "http://localhost:3000",
+    "https://31d3954f598a.ngrok-free.app",
     # Add your production frontend domain here when ready
     # "https://your-frontend-domain.com",
 ]
@@ -200,4 +202,9 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http:\/\/.*\.localhost:3000$",
     r"^http:\/\/.*\.127.0.0.1:3000$",
+]
+
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://31d3954f598a.ngrok-free.app',
 ]

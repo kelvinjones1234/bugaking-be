@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import now
 from django.db import IntegrityError, transaction
+from django.db import models
 from .models import (
     InvestmentPlan,
     InvestmentProject,
@@ -9,6 +10,8 @@ from .models import (
     ClientInvestment,
     PaymentSchedule,
 )
+
+
 
 # --- 1. INVESTMENT PLAN ADMIN ---
 
@@ -72,6 +75,50 @@ class InvestmentProjectAdmin(admin.ModelAdmin):
 # --- 5. PAYMENT SCHEDULE INLINE ---
 
 
+# class PaymentScheduleInline(admin.TabularInline):
+#     model = PaymentSchedule
+#     extra = 0
+#     can_delete = False
+#     fields = (
+#         "installment_number",
+#         "title",
+#         "due_date",
+#         "formatted_amount",
+#         "status",
+#         "date_paid",
+#     )
+#     readonly_fields = (
+#         "installment_number",
+#         "title",
+#         "due_date",
+#         "formatted_amount",
+#         "status",
+#         "date_paid",
+#     )
+
+#     def formatted_amount(self, obj):
+#         return f"₦{obj.amount:,.2f}" if obj.amount else "₦0.00"
+
+#     formatted_amount.short_description = "Amount"
+
+#     def has_add_permission(self, request, obj=None):
+#         return False
+
+#     def get_max_num(self, request, obj=None, **kwargs):
+#         """
+#         FORCE the admin to show zero rows if the object hasn't been created yet.
+#         This stops the Admin from sending empty formset data that causes the IntegrityError.
+#         """
+#         if obj is None:
+#             return 0
+#         return super().get_max_num(request, obj, **kwargs)
+
+
+
+
+
+# --- 5. PAYMENT SCHEDULE INLINE ---
+
 class PaymentScheduleInline(admin.TabularInline):
     model = PaymentSchedule
     extra = 0
@@ -89,8 +136,6 @@ class PaymentScheduleInline(admin.TabularInline):
         "title",
         "due_date",
         "formatted_amount",
-        "status",
-        "date_paid",
     )
 
     def formatted_amount(self, obj):
@@ -102,18 +147,12 @@ class PaymentScheduleInline(admin.TabularInline):
         return False
 
     def get_max_num(self, request, obj=None, **kwargs):
-        """
-        FORCE the admin to show zero rows if the object hasn't been created yet.
-        This stops the Admin from sending empty formset data that causes the IntegrityError.
-        """
         if obj is None:
             return 0
         return super().get_max_num(request, obj, **kwargs)
 
 
-# --- 6. CLIENT INVESTMENT ADMIN ---
-
-
+# --- CLIENT INVESTMENT ADMIN ---
 @admin.register(ClientInvestment)
 class ClientInvestmentAdmin(admin.ModelAdmin):
     list_display = (
@@ -142,6 +181,7 @@ class ClientInvestmentAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "installment_amount",
+        "formatted_amount_paid", # Make this readonly so admins don't edit it manually and break sync
     )
 
     fieldsets = (
@@ -155,7 +195,7 @@ class ClientInvestmentAdmin(admin.ModelAdmin):
                 "fields": (
                     "agreed_amount",
                     "installment_amount",
-                    "amount_paid",
+                    "formatted_amount_paid", # Display only
                     "formatted_balance",
                     "get_completion_percent",
                 )
@@ -214,9 +254,12 @@ class ClientInvestmentAdmin(admin.ModelAdmin):
     @admin.action(description="🔄 Refresh Schedule Status")
     def regenerate_schedules_action(self, request, queryset):
         for investment in queryset:
-            investment.update_schedule_statuses()
+            # We trigger the signal logic manually for older records
+            stats = investment.schedules.filter(status='paid').aggregate(total=models.Sum('amount'))
+            investment.amount_paid = stats['total'] or 0
+            investment.save()
         self.message_user(
-            request, f"Updated statuses for {queryset.count()} investment(s)."
+            request, f"Recalculated financials for {queryset.count()} investment(s)."
         )
 
     @admin.action(description="✅ Mark as Completed")
@@ -226,16 +269,17 @@ class ClientInvestmentAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """
-        Wrap the save in a transaction and handle potential integrity races.
+        Wrap the save in a transaction.
+        CRITICAL FIX: Refresh from DB after save to reflect signal updates.
         """
         try:
             with transaction.atomic():
                 super().save_model(request, obj, form, change)
+                # If we changed something in the investment that might trigger signals,
+                # or if inline edits happened, we want to see the result of the signals immediately.
                 if change:
-                    obj.update_schedule_statuses()
+                    obj.refresh_from_db()
         except IntegrityError:
-            # If the signal and admin collide, the signal already won.
-            # We refresh from DB to show the user the correct state.
             obj.refresh_from_db()
 
 
