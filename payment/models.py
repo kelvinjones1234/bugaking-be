@@ -53,3 +53,4 @@ class Transaction(models.Model):
         if not self.location and self.investment:
             self.location = self.investment.selected_option.project.location
         super().save(*args, **kwargs)
+ 

@@ -2,7 +2,6 @@ import json
 import hmac
 import hashlib
 from decimal import Decimal 
-from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -10,6 +9,14 @@ from django.db import transaction
 from django.utils.timezone import now
 from .models import ClientInvestment, Transaction
 from core.settings import get_env_variable
+from rest_framework import generics, permissions, filters
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Sum
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from .serializers import TransactionSerializer
+
+
 
 @csrf_exempt
 @require_POST
@@ -82,3 +89,62 @@ def paystack_webhook(request):
             print(f"Error processing webhook: {e}")
 
     return HttpResponse(status=200)
+
+
+
+
+
+class TransactionListView(generics.ListAPIView):
+    """
+    Returns a paginated list of transactions for the logged-in user.
+    Supports search and filtering.
+    """
+    serializer_class = TransactionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    # Enable Search and Filtering
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    
+    # Fields to filter by exactly (for dropdowns)
+    filterset_fields = [
+        'investment__selected_option__project__investment_type', # Sector filter
+    ]
+    
+    # Fields to search text (for search bar)
+    search_fields = [
+        'payment_reference', 
+        'location', 
+        'investment__selected_option__project__name'
+    ]
+    
+    # Default ordering
+    ordering = ['-timestamp']
+
+    def get_queryset(self):
+        # Only show transactions belonging to the logged-in user
+        return Transaction.objects.filter(user=self.request.user).select_related(
+            'investment', 
+            'investment__selected_option__project'
+        )
+
+class TransactionStatsView(APIView):
+    """
+    Returns the total stats for the transaction page header.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # Calculate total amount spent across all transactions
+        total_invested = Transaction.objects.filter(user=user).aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+
+        # You can add logic here for "percentage growth" if you have that data,
+        # otherwise return a static or calculated value.
+        
+        return Response({
+            "total_invested": total_invested,
+            "currency": "NGN"
+        })
