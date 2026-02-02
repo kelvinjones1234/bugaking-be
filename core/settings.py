@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # =========================================================
-#  FIX: Explicitly load the .env file from the project root
+#  Load Environment Variables
 # =========================================================
-env_path = BASE_DIR / '.env'
+env_path = BASE_DIR / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
@@ -21,28 +21,29 @@ def get_env_variable(var_name, default=None):
     return value
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# =========================================================
+#  Core Settings
+# =========================================================
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# We now pull this strictly from the .env file
 SECRET_KEY = get_env_variable("SECRET_KEY", "fallback-unsafe-secret-key-change-me")
 
-# Environment-based settings
+# FIX: Correct Logic for DEBUG
+# If DJANGO_ENV is 'production', DEBUG should be False.
 ENVIRONMENT = get_env_variable("DJANGO_ENV", "production")
-DEBUG = ENVIRONMENT == "development"
+DEBUG = ENVIRONMENT == "production" 
 
-# Allowed hosts
-# This allows you to define hosts in .env (e.g., "bugaking.com,www.bugaking.com")
-# or falls back to your PythonAnywhere domain.
-# allowed_hosts_env = get_env_variable("DJANGO_ALLOWED_HOSTS", "")
-# if allowed_hosts_env:
-#     ALLOWED_HOSTS = allowed_hosts_env.split(",")
-# else:
-ALLOWED_HOSTS = ["bugaking.pythonanywhere.com", "localhost", "127.0.0.1", "31d3954f598a.ngrok-free.app"]
+ALLOWED_HOSTS = [
+    "bugaking.pythonanywhere.com",
+    "localhost",
+    "127.0.0.1",
+    "31d3954f598a.ngrok-free.app",
+]
 
 
-# Application definition
+# =========================================================
+#  Applications
+# =========================================================
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -51,15 +52,16 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # custom app
+    "cloudinary_storage",  
+    "cloudinary",
+    # Custom Apps
     "account",
     "investment",
     "portfolio",
     "documents",
     "notification",
     "payment",
-    # third party app
-    "storages",
+    # Third Party Apps
     "rest_framework",
     "corsheaders",
     "django_filters",
@@ -68,7 +70,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware", # Critical for serving static files
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -100,9 +102,9 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
+# =========================================================
+#  Database
+# =========================================================
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -111,6 +113,9 @@ DATABASES = {
 }
 
 
+# =========================================================
+#  Authentication & API
+# =========================================================
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -118,85 +123,90 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
-
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    { "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator" },
+    { "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator" },
+    { "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator" },
+    { "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator" },
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
+# =========================================================
+#  Email Configuration
+# =========================================================
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = get_env_variable("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(get_env_variable("EMAIL_PORT", "465"))
+EMAIL_USE_SSL = get_env_variable("EMAIL_USE_SSL", "True").lower() == "true"
+EMAIL_USE_TLS = get_env_variable("EMAIL_USE_TLS", "False").lower() == "true"
+EMAIL_HOST_USER = get_env_variable("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = get_env_variable("EMAIL_HOST_PASSWORD")
 
+
+# =========================================================
+#  Internationalization
+# =========================================================
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
+# =========================================================
+#  Static & Media Files (Crucial Fixes Here)
+# =========================================================
 
-STATIC_URL = "static/"
+# 1. Cloudinary Credentials
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": get_env_variable("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": get_env_variable("CLOUDINARY_API_KEY"),
+    "API_SECRET": get_env_variable("CLOUDINARY_API_SECRET"),
+}
+
+# 2. Static Files (CSS/JS)
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Media Files Configuration
-if DEBUG:
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR / "media"
-else:
-    # Production: Use Cloudflare R2
-    STORAGES = {
-        "staticfiles": {
-            "BACKEND": "helper.cloudflare.storages.StaticStorage",
-            "OPTIONS": {
-                "bucket_name": get_env_variable("CLOUDFLARE_R2_BUCKET"),
-                "access_key": get_env_variable("CLOUDFLARE_R2_ACCESS_KEY"),
-                "secret_key": get_env_variable("CLOUDFLARE_R2_SECRETE_KEY"),
-                "endpoint_url": get_env_variable("CLOUDFLARE_R2_BUCKET_ENDPOINT"),
-                "default_acl": "public-read",
-                "signature_version": "s3v4",
-            },
-        },
-        "default": {
-            "BACKEND": "helper.cloudflare.storages.MediaStorage",
-            "OPTIONS": {
-                "bucket_name": get_env_variable("CLOUDFLARE_R2_BUCKET"),
-                "access_key": get_env_variable("CLOUDFLARE_R2_ACCESS_KEY"),
-                "secret_key": get_env_variable("CLOUDFLARE_R2_SECRETE_KEY"),
-                "endpoint_url": get_env_variable("CLOUDFLARE_R2_BUCKET_ENDPOINT"),
-                "default_acl": "public-read",
-                "signature_version": "s3v4",
-            },
-        },
-    }
+# FIX: Explicitly define Finders so Django knows where to look for Admin CSS
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+]
+
+# FIX: Explicitly define the local static directory (Create this folder if it doesn't exist)
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
+# 3. Media Files (Images/Videos)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# 4. Storage Configuration (Django 4.2+)
+# We use standard storage for static files (to avoid WhiteNoise crash)
+# We use Cloudinary for media files.
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+}
 
 
-# CORS Settings
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
+# =========================================================
+#  CORS Settings
+# =========================================================
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "https://bugaking.vercel.app",
     "http://127.0.0.1:3000",
     "http://localhost:3000",
     "https://31d3954f598a.ngrok-free.app",
-    # Add your production frontend domain here when ready
-    # "https://your-frontend-domain.com",
 ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -204,7 +214,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http:\/\/.*\.127.0.0.1:3000$",
 ]
 
-
 CSRF_TRUSTED_ORIGINS = [
-    'https://31d3954f598a.ngrok-free.app',
+    "https://31d3954f598a.ngrok-free.app",
+    "https://bugaking.vercel.app",
 ]
