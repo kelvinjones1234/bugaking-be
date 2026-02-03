@@ -26,8 +26,11 @@ def get_env_variable(var_name, default=None):
 SECRET_KEY = get_env_variable("SECRET_KEY", "fallback-unsafe-secret-key-change-me")
 
 # FIX: Corrected Logic (DEBUG should be False in production)
-ENVIRONMENT = get_env_variable("DJANGO_ENV", "production")
+ENVIRONMENT = get_env_variable("DJANGO_ENV", "development")
 DEBUG = ENVIRONMENT == "development"
+
+
+DEBUG = True
 
 ALLOWED_HOSTS = [
     "bugaking.pythonanywhere.com",
