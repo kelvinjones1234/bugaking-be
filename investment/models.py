@@ -40,6 +40,7 @@ class InvestmentProject(models.Model):
 
     ASSET_TYPES = (
         ("terrace", "Terrace"),
+        ("farmland", "Farmland"),
     )
 
     name = models.CharField(max_length=255, db_index=True) # Indexed for search
